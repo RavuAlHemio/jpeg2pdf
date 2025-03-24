@@ -1,0 +1,21 @@
+default PDF user space unit: 1 pt = 1/72 in
+conversion: 1/72 in/pt
+
+if resolution is given in dpi:
+we have two variables: dim (dimension) and res (resolution)
+[dim] = px
+[res] = px/in
+
+[dim/res] = in
+[dim * 72 / res] = pt
+
+if resolution is given in dpcm:
+same two variables
+[dim] = px
+[res] = px/cm
+
+[dim/res] = cm
+[dim/(res * 2.54)] = in
+[(dim * 72)/(res * 2.54)] = pt
+[(dim * 720)/(res * 25.4)] = pt
+[(dim * 7200)/(res * 254)] = pt
