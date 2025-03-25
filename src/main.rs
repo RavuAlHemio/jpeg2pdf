@@ -1,3 +1,4 @@
+mod exif;
 mod jpeg;
 mod pdf;
 

@@ -100,6 +100,7 @@ pub enum Error {
     UnexpectedJfifVersion { expected: u16, obtained: u16 },
     JfifTooShort { min_expected: usize, obtained: usize },
     SofTooShort { min_expected: usize, obtained: usize },
+    Exif(crate::exif::Error),
 }
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -126,6 +127,8 @@ impl fmt::Display for Error {
                 => write!(f, "JFIF header too short; expected at least {} bytes, obtained {}", min_expected, obtained),
             Self::SofTooShort { min_expected, obtained }
                 => write!(f, "Start-of-Frame too short; expected at least {} bytes, obtained {}", min_expected, obtained),
+            Self::Exif(e)
+                => write!(f, "Exif-specific error: {}", e),
         }
     }
 }
@@ -143,11 +146,15 @@ impl std::error::Error for Error {
             Self::UnexpectedJfifVersion { .. } => None,
             Self::JfifTooShort { .. } => None,
             Self::SofTooShort { .. } => None,
+            Self::Exif(e) => Some(e),
         }
     }
 }
 impl From<io::Error> for Error {
     fn from(value: io::Error) -> Self { Self::Io(value) }
+}
+impl From<crate::exif::Error> for Error {
+    fn from(value: crate::exif::Error) -> Self { Self::Exif(value) }
 }
 
 
@@ -200,7 +207,8 @@ impl Image {
 
         builder.image_data = image_data;
 
-        for block in &builder.leading_blocks {
+        let leading_blocks_clone = builder.leading_blocks.clone();
+        for block in &leading_blocks_clone {
             let data = block.data();
             match block.kind() {
                 0xE0 => {
@@ -224,6 +232,12 @@ impl Image {
                     builder.density_unit = Some(unit);
                     builder.density_x = Some(density_x);
                     builder.density_y = Some(density_y);
+                },
+                0xE1 => {
+                    // APP1
+                    if data.starts_with(b"Exif\0\0") {
+                        crate::exif::process(data, &mut builder)?;
+                    }
                 },
                 0xC0..=0xC3|0xC5..=0xC7|0xC9..=0xCB|0xCD..=0xCF => {
                     // start of frame
