@@ -97,7 +97,7 @@ pub enum Error {
     UnexpectedBlock { expected_kind: u8, obtained_kind: u8 },
     IncorrectImageDataTermination,
     NotJfif,
-    UnexpectedJfifVersion { expected: u16, obtained: u16 },
+    UnsupportedJfifVersion { obtained: u16 },
     JfifTooShort { min_expected: usize, obtained: usize },
     SofTooShort { min_expected: usize, obtained: usize },
     Exif(crate::exif::Error),
@@ -121,8 +121,8 @@ impl fmt::Display for Error {
                 => write!(f, "image data terminated incorrectly"),
             Self::NotJfif
                 => write!(f, "file is not a JFIF file"),
-            Self::UnexpectedJfifVersion { expected, obtained }
-                => write!(f, "unexpected JFIF version; expected 0x{:04X}, obtained 0x{:04X}", expected, obtained),
+            Self::UnsupportedJfifVersion { obtained }
+                => write!(f, "unsupported JFIF version; obtained {}.{:02}", (obtained >> 8) & 0xFF, (obtained >> 0) & 0xFF),
             Self::JfifTooShort { min_expected, obtained }
                 => write!(f, "JFIF header too short; expected at least {} bytes, obtained {}", min_expected, obtained),
             Self::SofTooShort { min_expected, obtained }
@@ -143,7 +143,7 @@ impl std::error::Error for Error {
             Self::UnexpectedBlock { .. } => None,
             Self::IncorrectImageDataTermination => None,
             Self::NotJfif => None,
-            Self::UnexpectedJfifVersion { .. } => None,
+            Self::UnsupportedJfifVersion { .. } => None,
             Self::JfifTooShort { .. } => None,
             Self::SofTooShort { .. } => None,
             Self::Exif(e) => Some(e),
@@ -221,8 +221,8 @@ impl Image {
                     }
 
                     let version = u16::from_be_bytes(data[5..7].try_into().unwrap());
-                    if version != 0x0101 {
-                        return Err(Error::UnexpectedJfifVersion { expected: 0x0101, obtained: version });
+                    if version != 0x0101 && version != 0x0102 {
+                        return Err(Error::UnsupportedJfifVersion { obtained: version });
                     }
 
                     let unit = DensityUnit::from_base_type(data[7]);
